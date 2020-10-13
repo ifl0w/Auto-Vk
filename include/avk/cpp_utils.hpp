@@ -430,14 +430,14 @@ namespace avk
 	    {
 	        Fn fn;
 
-	        wrapper(Fn fn) : fn(std::move(fn)) { }
+	        wrapper(Fn fn) noexcept : fn(std::move(fn)) { }
 
 	        wrapper(wrapper&&) noexcept = default;
 	        wrapper& operator=(wrapper&&) noexcept = default;
 
 	        // these two functions are instantiated by std::function and are never called
-	        wrapper(const wrapper& rhs) noexcept : fn(const_cast<Fn&&>(rhs.fn)) { throw avk::logic_error("never called"); } // hack to initialize fn for non-DefaultContructible types
-	        wrapper& operator=(const wrapper&) noexcept { throw avk::logic_error("never called"); }
+	        wrapper(const wrapper& rhs) : fn(const_cast<Fn&&>(rhs.fn)) { throw avk::logic_error("never called"); } // hack to initialize fn for non-DefaultContructible types
+	        wrapper& operator=(const wrapper&) { throw avk::logic_error("never called"); }
 
 			~wrapper() = default;
 
@@ -448,9 +448,9 @@ namespace avk
 	    using base = std::function<T>;
 
 	public:
-		unique_function() = default;
+		unique_function() noexcept = default;
 		unique_function(std::nullptr_t) noexcept : base(nullptr) {}
-		unique_function(const unique_function&) noexcept = default;
+		unique_function(const unique_function&) = default;
 		unique_function(unique_function&&) noexcept = default;
 
 		template<class Fn> 
@@ -458,7 +458,7 @@ namespace avk
 
 		~unique_function() = default;
 
-		unique_function& operator=(const unique_function&) noexcept = default;
+		unique_function& operator=(const unique_function&) = default;
 		unique_function& operator=(unique_function&&) noexcept = default;
 		unique_function& operator=(std::nullptr_t) noexcept
 		{
