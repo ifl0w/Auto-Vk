@@ -71,7 +71,8 @@ namespace avk { class sync; }
  *	Define the macro AVK_USE_VMA to enable memory allocation via Vulkan Memory Allocator.
  *	Note 1: You'll have to #define AVK_USE_VMA before the #include <avk/avk.hpp> statement!
  *	Note 2: Vulkan Memory Allocator is not enabled by default. By default, you'll get
- *	        a very "stupid" memory allocation behavior with one allocation per resource.
+ *	        a very straight-forward and unoptimized memory allocation behavior, where
+ *	        one memory allocation is made per resource.
  *	Note 3: If you are opting-in for using Vulkan Memory Allocator, make sure to add the
  *	        implementation file vk_mem_alloc.cpp to your project!
  */
@@ -138,6 +139,8 @@ namespace avk { class sync; }
 #include <avk/descriptor_set_layout.hpp>
 #include <avk/set_of_descriptor_set_layouts.hpp>
 #include <avk/descriptor_cache.hpp>
+
+#include <avk/commands.hpp>
 
 #include <avk/buffer.hpp>
 #include <avk/shader_info.hpp>
