@@ -175,8 +175,8 @@ namespace avk
 		 */
 		std::optional<command_buffer> fill(const void* aDataPtr, size_t aMetaDataIndex, sync aSyncHandler);
 
-		// Non-sync version of buffer_t::fill
-		std::optional<commands> fill(const void* aDataPtr, size_t aMetaDataIndex);
+		//// Non-sync version of buffer_t::fill
+		//std::optional<commands> fill(const void* aDataPtr, size_t aMetaDataIndex);
 
 		/** Read data from buffer back to the CPU-side.
 		 */

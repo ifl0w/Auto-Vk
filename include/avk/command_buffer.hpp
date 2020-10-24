@@ -210,7 +210,7 @@ namespace avk
 
 		// Template specializations are implemented in the respective pipeline's header files
 		template <typename T> // Expected to be just the pipeline's type
-		void bind_pipeline(const T& aPipeline)
+		void bind_pipeline(T aPipeline)
 		{
 			assert(false);
 			throw avk::logic_error("No suitable bind_pipeline overload found for the given argument.");
