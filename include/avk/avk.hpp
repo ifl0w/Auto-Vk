@@ -142,8 +142,6 @@ namespace avk { class sync; }
 #include <avk/set_of_descriptor_set_layouts.hpp>
 #include <avk/descriptor_cache.hpp>
 
-#include <avk/commands.hpp>
-
 #include <avk/buffer.hpp>
 #include <avk/shader_info.hpp>
 
@@ -196,7 +194,6 @@ namespace avk { class sync; }
 
 #include <avk/bindings.hpp>
 
-#include <avk/commands.hpp>
 #include <avk/vk_utils2.hpp>
 
 namespace avk
@@ -805,3 +802,5 @@ namespace avk
 #pragma endregion
 	};
 }
+
+#include <avk/commands.hpp>

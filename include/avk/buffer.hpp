@@ -83,6 +83,9 @@ namespace avk
 		
 		auto& config() const	{ return mCreateInfo; }
 		auto handle() const		{ return mBuffer.resource(); }
+		auto physical_device() const { return mPhysicalDevice; }
+		auto device() const { return mDevice; }
+		auto allocator() const { return mBuffer.allocator(); }
 
 		/** Returns a reference to this buffer's memory handle.
 		 *	Attention: It returns a reference! => Use with caution,
