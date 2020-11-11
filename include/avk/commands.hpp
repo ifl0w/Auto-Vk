@@ -38,64 +38,98 @@ namespace avk
 	};
 
 
-//	auto copy_into_buffer(resource_reference<buffer_t> aTargetBuffer, const void* aDataPtr, size_t aMetaDataIndex, size_t aOffsetInBytes, size_t aDataSizeInBytes)
-//	{
-//		return[
-//			aTargetBuffer,
-//			aDataPtr,
-//			aMetaDataIndex,
-//			aOffsetInBytes,
-//			aDataSizeInBytes
-//		](resource_reference<command_buffer_t> aCommandBuffer){
-//			auto dataSize = static_cast<vk::DeviceSize>(aDataSizeInBytes);
-//			auto memProps = aTargetBuffer->memory_properties();
-//
-//#ifdef _DEBUG
-//			const auto& metaData = meta_at_index<buffer_meta>(aMetaDataIndex);
-//			assert(aOffsetInBytes + aDataSizeInBytes <= metaData.total_size()); // The fill operation would write beyond the buffer's size.
-//#endif
-//
-//			// #1: Is our memory accessible from the CPU-SIDE? 
-//			if (avk::has_flag(memProps, vk::MemoryPropertyFlagBits::eHostVisible)) {
-//				auto scopedMapping = aTargetBuffer->map_memory(mapping_access::write);
-//				memcpy(static_cast<uint8_t *>(scopedMapping.get()) + aOffsetInBytes, aDataPtr, dataSize);
-//				return;
-//			}
-//
-//			// #2: Otherwise, it must be on the GPU-SIDE!
-//			else {
-//				assert(avk::has_flag(memProps, vk::MemoryPropertyFlagBits::eDeviceLocal));
-//
-//				// We have to create a (somewhat temporary) staging buffer and transfer it to the GPU
-//				// "somewhat temporary" means that it can not be deleted in this function, but only
-//				//						after the transfer operation has completed => handle via sync
-//				auto stagingBuffer = root::create_buffer(
-//					aTargetBuffer->physical_device(), aTargetBuffer->device(), aTargetBuffer->allocator(),
-//					AVK_STAGING_BUFFER_MEMORY_USAGE,
-//					vk::BufferUsageFlagBits::eTransferSrc,
-//					generic_buffer_meta::create_from_size(dataSize)
-//				);
-//				copy_into_buffer(avk::referenced(stagingBuffer), aDataPtr, 0, 0, dataSize)(aCommandBuffer); // Recurse into the other if-branch
-//
-//				// Sync before:
-//				//TODO: aSyncHandler.establish_barrier_before_the_operation(pipeline_stage::transfer, read_memory_access{memory_access::transfer_read_access});
-//
-//				// Operation:
-//				copy_buffer_to_another(avk::referenced(stagingBuffer), aTargetBuffer, 0, static_cast<vk::DeviceSize>(aOffsetInBytes), dataSize, sync::with_barriers_into_existing_command_buffer(aCommandBuffer.get(), {}, {}));
-//
-//				// Sync after:
-//				//TODO: aSyncHandler.establish_barrier_after_the_operation(pipeline_stage::transfer, write_memory_access{memory_access::transfer_write_access});
-//
-//				// Take care of the lifetime handling of the stagingBuffer, it might still be in use:
-//				aCommandBuffer->set_custom_deleter([
-//					lOwnedStagingBuffer{ std::move(stagingBuffer) }
-//				]() { /* Nothing to do here, the buffers' destructors will do the cleanup, the lambda is just storing it. */ });
-//				
-//				// Finish him:
-//				//return aSyncHandler.submit_and_sync();			
-//			}
-//		};
-//		
-//	}
-	
+	auto copy_into_buffer(const void* aSrcDataPtr, resource_reference<buffer_t> aDstBuffer, size_t aMetaDataIndex, size_t aOffsetInBytes, size_t aDataSizeInBytes)
+	{
+		auto impl = [aSrcDataPtr, aDstBuffer, aMetaDataIndex, aOffsetInBytes, aDataSizeInBytes](resource_reference<command_buffer_t> aCommandBuffer){
+			auto recursiveImpl = [](const void* bSrcDataPtr, resource_reference<buffer_t> bDstBuffer, size_t bMetaDataIndex, size_t bOffsetInBytes, size_t bDataSizeInBytes, resource_reference<command_buffer_t> bCommandBuffer, const auto& bCopyIntoBufferLambda){
+				auto dataSize = static_cast<vk::DeviceSize>(bDataSizeInBytes);
+				auto memProps = bDstBuffer->memory_properties();
+
+#ifdef _DEBUG
+				const auto& metaData = meta_at_index<buffer_meta>(aMetaDataIndex);
+				assert(aOffsetInBytes + aDataSizeInBytes <= metaData.total_size()); // The fill operation would write beyond the buffer's size.
+#endif
+
+				// #1: Is our memory accessible from the CPU-SIDE? 
+				if (avk::has_flag(memProps, vk::MemoryPropertyFlagBits::eHostVisible)) {
+					auto scopedMapping = bDstBuffer->map_memory(mapping_access::write);
+					memcpy(static_cast<uint8_t *>(scopedMapping.get()) + bOffsetInBytes, bSrcDataPtr, dataSize);
+					return;
+				}
+
+				// #2: Otherwise, it must be on the GPU-SIDE!
+				else {
+					assert(avk::has_flag(memProps, vk::MemoryPropertyFlagBits::eDeviceLocal));
+
+					// We have to create a (somewhat temporary) staging buffer and transfer it to the GPU
+					// "somewhat temporary" means that it can not be deleted in this function, but only
+					//						after the transfer operation has completed => handle via sync
+					auto stagingBuffer = root::create_buffer(
+						bDstBuffer->physical_device(), bDstBuffer->device(), bDstBuffer->allocator(),
+						AVK_STAGING_BUFFER_MEMORY_USAGE,
+						vk::BufferUsageFlagBits::eTransferSrc,
+						generic_buffer_meta::create_from_size(dataSize)
+					);
+					bCopyIntoBufferLambda(bSrcDataPtr, avk::referenced(stagingBuffer), 0, 0, dataSize, bCommandBuffer, bCopyIntoBufferLambda); // Recurse into the other if-branch
+
+					// Sync before:
+					//TODO: aSyncHandler.establish_barrier_before_the_operation(pipeline_stage::transfer, read_memory_access{memory_access::transfer_read_access});
+
+					// Operation:
+					copy_buffer_to_another(avk::referenced(stagingBuffer), bDstBuffer, 0, static_cast<vk::DeviceSize>(bOffsetInBytes), dataSize, sync::with_barriers_into_existing_command_buffer(bCommandBuffer.get(), {}, {}));
+
+					// Sync after:
+					//TODO: aSyncHandler.establish_barrier_after_the_operation(pipeline_stage::transfer, write_memory_access{memory_access::transfer_write_access});
+
+					// Take care of the lifetime handling of the stagingBuffer, it might still be in use:
+					bCommandBuffer->set_custom_deleter([
+						lOwnedStagingBuffer{ std::move(stagingBuffer) }
+					]() { /* Nothing to do here, the buffers' destructors will do the cleanup, the lambda is just storing it. */ });
+					
+					// Finish him:
+					//return aSyncHandler.submit_and_sync();			
+				}
+			};
+			recursiveImpl(aSrcDataPtr, aDstBuffer, aMetaDataIndex, aOffsetInBytes, aDataSizeInBytes, aCommandBuffer, recursiveImpl);
+		};
+		return impl;
+	}
+
+	struct copy_source_for_pointer
+	{
+		auto copy_destination(resource_reference<buffer_t> aDstBuffer, std::optional<size_t> aMetaDataIndex, std::optional<size_t> aOffsetInBytes, std::optional<size_t> aDataSizeInBytes) const
+		{
+			return copy_into_buffer(mSrc, std::move(aDstBuffer), aMetaDataIndex.value_or(0), aOffsetInBytes.value_or(0), aDataSizeInBytes.value_or(aDstBuffer->meta_at_index<generic_buffer_meta>(0).total_size()));
+		}
+		
+		const void* mSrc;
+	};
+	copy_source_for_pointer copy_source(const void* aSrcDataPtr) { return copy_source_for_pointer{ aSrcDataPtr }; }
+		
+	struct copy_source_for_reference
+	{
+		auto copy_destination(resource_reference<buffer_t> aDstBuffer, std::optional<size_t> aMetaDataIndex, std::optional<size_t> aOffsetInBytes, std::optional<size_t> aDataSizeInBytes) const
+		{
+			// TODO: use vkCmdCopyBuffer
+			//return copy_into_buffer(mSrc, std::move(aDstBuffer), aMetaDataIndex.value_or(0), aOffsetInBytes.value_or(0), aDataSizeInBytes.value_or(aDstBuffer->meta_at_index<generic_buffer_meta>(0).total_size()));
+		}
+		
+		resource_reference<buffer_t> mSrc;
+	};
+	copy_source_for_reference copy_source(resource_reference<buffer_t> aSrcBuffer) { return copy_source_for_reference{ std::move(aSrcBuffer) }; }
+		
+	struct copy_source_for_ownership
+	{
+		auto copy_destination(resource_reference<buffer_t> aDstBuffer, std::optional<size_t> aMetaDataIndex, std::optional<size_t> aOffsetInBytes, std::optional<size_t> aDataSizeInBytes) const
+		{
+			// TODO: use vkCmdCopyBuffer, handle the lifetime of mSrc in some way!
+			//return unique_function<void(resource_reference<command_buffer_t>)>(....)
+			//return copy_into_buffer(mSrc, std::move(aDstBuffer), aMetaDataIndex.value_or(0), aOffsetInBytes.value_or(0), aDataSizeInBytes.value_or(aDstBuffer->meta_at_index<generic_buffer_meta>(0).total_size()));
+		}
+		
+		resource_ownership<buffer_t> mSrc;
+	};
+	copy_source_for_ownership copy_source(resource_ownership<buffer_t> aSrcBuffer) { return copy_source_for_ownership{ std::move(aSrcBuffer) }; }
+		
+
 }
