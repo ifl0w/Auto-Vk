@@ -37,7 +37,53 @@ namespace avk
 		sync_data mPostSync;
 	};
 
+	auto copy_buffer_to_another(avk::resource_reference<buffer_t> aSrcBuffer, avk::resource_reference<buffer_t> aDstBuffer, std::optional<vk::DeviceSize> aSrcOffset, std::optional<vk::DeviceSize> aDstOffset, std::optional<vk::DeviceSize> aDataSize)
+	{
+		auto impl = [aSrcBuffer, aDstBuffer, aSrcOffset, aDstOffset, aDataSize](resource_reference<command_buffer_t> aCommandBuffer){
 
+			vk::DeviceSize dataSize{0};
+			if (aDataSize.has_value()) {
+				dataSize = aDataSize.value();
+			}
+			else {
+				dataSize = aSrcBuffer->meta_at_index<buffer_meta>().total_size();
+			}
+			
+	#ifdef _DEBUG
+			{
+				const auto& metaDataSrc = aSrcBuffer->meta_at_index<buffer_meta>();
+				const auto& metaDataDst = aDstBuffer->meta_at_index<buffer_meta>();
+				assert (aSrcOffset.value_or(0) + dataSize <= metaDataSrc.total_size());
+				assert (aDstOffset.value_or(0) + dataSize <= metaDataDst.total_size());
+				assert (aSrcOffset.value_or(0) + dataSize <= metaDataDst.total_size());
+			}
+	#endif
+			
+			auto copyRegion = vk::BufferCopy{}
+				.setSrcOffset(aSrcOffset.value_or(0))
+				.setDstOffset(aDstOffset.value_or(0))
+				.setSize(dataSize);
+			aCommandBuffer->handle().copyBuffer(aSrcBuffer->handle(), aDstBuffer->handle(), 1u, &copyRegion);
+			
+		};
+
+		//// Sync before:
+		//aSyncHandler.establish_barrier_before_the_operation(pipeline_stage::transfer, read_memory_access{memory_access::transfer_read_access});
+		//// Sync after:
+		//aSyncHandler.establish_barrier_after_the_operation(pipeline_stage::transfer, write_memory_access{memory_access::transfer_write_access});
+		//// Finish him:
+		//return aSyncHandler.submit_and_sync();
+
+		return std::forward_as_tuple(
+			// DESTINATION sync parameters to synchronize with whatever happened before:
+			std::make_tuple(pipeline_stage::transfer, memory_access::transfer_read_access), // TODO: Could there be cases where also write-access must be synchronized?
+			// The operation:
+			impl,
+			// SOURCE sync parameters to synchronize with whatever happens after:
+			std::make_tuple(pipeline_stage::transfer, memory_access::transfer_write_access)
+		);
+	}
+	
 	auto copy_into_buffer(const void* aSrcDataPtr, resource_reference<buffer_t> aDstBuffer, size_t aMetaDataIndex, size_t aOffsetInBytes, size_t aDataSizeInBytes)
 	{
 		auto impl = [aSrcDataPtr, aDstBuffer, aMetaDataIndex, aOffsetInBytes, aDataSizeInBytes](resource_reference<command_buffer_t> aCommandBuffer){
@@ -90,10 +136,11 @@ namespace avk
 					//return aSyncHandler.submit_and_sync();			
 				}
 			};
-			recursiveImpl(aSrcDataPtr, aDstBuffer, aMetaDataIndex, aOffsetInBytes, aDataSizeInBytes, aCommandBuffer, recursiveImpl);
+			recursiveImpl(aSrcDataPtr, aDstBuffer, aMetaDataIndex, aOffsetInBytes, aDataSizeInBytes, std::move(aCommandBuffer), recursiveImpl);
 		};
 		return impl;
 	}
+
 
 	struct copy_source_for_pointer
 	{
