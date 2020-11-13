@@ -39,33 +39,30 @@ namespace avk
 
 	auto copy_buffer_to_another(avk::resource_reference<buffer_t> aSrcBuffer, avk::resource_reference<buffer_t> aDstBuffer, std::optional<vk::DeviceSize> aSrcOffset, std::optional<vk::DeviceSize> aDstOffset, std::optional<vk::DeviceSize> aDataSize)
 	{
-		auto impl = [aSrcBuffer, aDstBuffer, aSrcOffset, aDstOffset, aDataSize](resource_reference<command_buffer_t> aCommandBuffer){
-
-			vk::DeviceSize dataSize{0};
-			if (aDataSize.has_value()) {
-				dataSize = aDataSize.value();
-			}
-			else {
-				dataSize = aSrcBuffer->meta_at_index<buffer_meta>().total_size();
-			}
-			
+		auto impl = [
+			aSrcBuffer, 
+			aDstBuffer, 
+			lSrcOffset = aSrcOffset.value_or(0), 
+			lDstOffset = aDstOffset.value_or(0),
+			lDataSize = aDataSize.value_or(aSrcBuffer->meta_at_index<buffer_meta>().total_size())
+		](resource_reference<command_buffer_t> aCommandBuffer){
 	#ifdef _DEBUG
 			{
 				const auto& metaDataSrc = aSrcBuffer->meta_at_index<buffer_meta>();
 				const auto& metaDataDst = aDstBuffer->meta_at_index<buffer_meta>();
-				assert (aSrcOffset.value_or(0) + dataSize <= metaDataSrc.total_size());
-				assert (aDstOffset.value_or(0) + dataSize <= metaDataDst.total_size());
-				assert (aSrcOffset.value_or(0) + dataSize <= metaDataDst.total_size());
+				assert (lSrcOffset + lDataSize <= metaDataSrc.total_size());
+				assert (lDstOffset + lDataSize <= metaDataDst.total_size());
+				assert (lSrcOffset + lDataSize <= metaDataDst.total_size());
 			}
 	#endif
 			
 			auto copyRegion = vk::BufferCopy{}
-				.setSrcOffset(aSrcOffset.value_or(0))
-				.setDstOffset(aDstOffset.value_or(0))
-				.setSize(dataSize);
+				.setSrcOffset(lSrcOffset)
+				.setDstOffset(lDstOffset)
+				.setSize(lDataSize);
 			aCommandBuffer->handle().copyBuffer(aSrcBuffer->handle(), aDstBuffer->handle(), 1u, &copyRegion);
 			
-		};
+		}; 
 
 		//// Sync before:
 		//aSyncHandler.establish_barrier_before_the_operation(pipeline_stage::transfer, read_memory_access{memory_access::transfer_read_access});
@@ -92,8 +89,8 @@ namespace avk
 				auto memProps = bDstBuffer->memory_properties();
 
 #ifdef _DEBUG
-				const auto& metaData = meta_at_index<buffer_meta>(aMetaDataIndex);
-				assert(aOffsetInBytes + aDataSizeInBytes <= metaData.total_size()); // The fill operation would write beyond the buffer's size.
+				const auto& metaData = bDstBuffer->meta_at_index<buffer_meta>(bMetaDataIndex);
+				assert(bOffsetInBytes + bDataSizeInBytes <= metaData.total_size()); // The fill operation would write beyond the buffer's size.
 #endif
 
 				// #1: Is our memory accessible from the CPU-SIDE? 
