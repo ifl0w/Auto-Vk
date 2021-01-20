@@ -104,7 +104,7 @@ namespace avk
 		 *												This handler is generally considered to be neccessary and hence, set to a default handler by default.
 		 */
 		static sync with_barriers_by_return(
-			avk::unique_function<void(command_buffer_t&, pipeline_stage /* destination stage */, std::optional<read_memory_access> /* destination access */)> aEstablishBarrierBeforeOperation = {},
+			avk::unique_function<void(command_buffer_t&, pipeline_stage /* destination stage */, std::optional<read_memory_access> /* destination access */)> aEstablishBarrierBeforeOperation = presets::default_handler_before_operation,
 			avk::unique_function<void(command_buffer_t&, pipeline_stage /* source stage */,	  std::optional<write_memory_access> /* source access */)> aEstablishBarrierAfterOperation = presets::default_handler_after_operation)
 		{
 			sync result;
@@ -131,7 +131,7 @@ namespace avk
 		 */
 		static sync with_barriers_into_existing_command_buffer(
 			command_buffer_t& aExistingCommandBuffer,
-			avk::unique_function<void(command_buffer_t&, pipeline_stage /* destination stage */, std::optional<read_memory_access> /* destination access */)> aEstablishBarrierBeforeOperation = {},
+			avk::unique_function<void(command_buffer_t&, pipeline_stage /* destination stage */, std::optional<read_memory_access> /* destination access */)> aEstablishBarrierBeforeOperation = presets::default_handler_before_operation,
 			avk::unique_function<void(command_buffer_t&, pipeline_stage /* source stage */,	  std::optional<write_memory_access> /* source access */)> aEstablishBarrierAfterOperation = presets::default_handler_after_operation)
 		{
 			sync result;
@@ -158,7 +158,7 @@ namespace avk
 		template <typename F>
 		static sync with_barriers(
 			F&& aCommandBufferLifetimeHandler,
-			avk::unique_function<void(command_buffer_t&, pipeline_stage /* destination stage */, std::optional<read_memory_access> /* destination access */)> aEstablishBarrierBeforeOperation = {},
+			avk::unique_function<void(command_buffer_t&, pipeline_stage /* destination stage */, std::optional<read_memory_access> /* destination access */)> aEstablishBarrierBeforeOperation = presets::default_handler_before_operation,
 			avk::unique_function<void(command_buffer_t&, pipeline_stage /* source stage */,	  std::optional<write_memory_access> /* source access */)> aEstablishBarrierAfterOperation = presets::default_handler_after_operation)
 		{
 			sync result;

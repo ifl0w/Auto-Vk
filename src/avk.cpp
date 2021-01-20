@@ -5190,10 +5190,10 @@ namespace avk
 
 		std::array layoutTransitions = { // during the loop, we'll use 1 or 2 of these
 			vk::ImageMemoryBarrier{
-				{}, {}, // Memory is available AND already visible for transfer read because that has been established in establish_barrier_before_the_operation above.
+				{}, vk::AccessFlagBits::eTransferRead | vk::AccessFlagBits::eTransferWrite, // Memory is available AND already visible for transfer read because that has been established in establish_barrier_before_the_operation above.
 				originalLayout, vk::ImageLayout::eTransferSrcOptimal, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, handle(), vk::ImageSubresourceRange{ mAspectFlags, 0u, 1u, 0u, 1u }},
 			vk::ImageMemoryBarrier{
-				{}, vk::AccessFlagBits::eTransferWrite, // This is the first mip-level we're going to write to
+				{}, vk::AccessFlagBits::eTransferRead | vk::AccessFlagBits::eTransferWrite, // This is the first mip-level we're going to write to
 				originalLayout, vk::ImageLayout::eTransferDstOptimal, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, handle(), vk::ImageSubresourceRange{ mAspectFlags, 1u, 1u, 0u, 1u }},
 			vk::ImageMemoryBarrier{} // To be used in loop
 		};
@@ -5222,7 +5222,7 @@ namespace avk
 
 			// mip-level  i-1  is done:
 			layoutTransitions[0] = vk::ImageMemoryBarrier{
-				{}, {}, // Blit Read -> Done
+				vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eTransferRead, // layout transition Write -> layout transition Read
 				vk::ImageLayout::eTransferSrcOptimal, targetLayout, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, handle(), vk::ImageSubresourceRange{ mAspectFlags, i-1, 1u, 0u, 1u }};
 			// mip-level   i   has been transfer destination, but is going to be transfer source:
 			layoutTransitions[1] = vk::ImageMemoryBarrier{
@@ -5230,7 +5230,7 @@ namespace avk
 				vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eTransferSrcOptimal, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, handle(), vk::ImageSubresourceRange{ mAspectFlags, i, 1u, 0u, 1u }};
 			// mip-level  i+1  is entering the game:
 			layoutTransitions[2] = vk::ImageMemoryBarrier{
-				{}, vk::AccessFlagBits::eTransferWrite, // make visible to Blit Write
+				vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eTransferRead | vk::AccessFlagBits::eTransferWrite, // make visible to Blit Write
 				originalLayout, vk::ImageLayout::eTransferDstOptimal, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, handle(), vk::ImageSubresourceRange{ mAspectFlags, i+1, 1u, 0u, 1u }};
 
 			uint32_t numBarriersRequired = std::min(3u, config().mipLevels - i + 1);
@@ -7728,11 +7728,11 @@ using namespace cpplinq;
 			1u, &copyRegion);
 
 		if (aRestoreSrcLayout) { // => restore original layout of the src image
-			aSrcImage->transition_to_layout(originalSrcLayout, sync::auxiliary_with_barriers(aSyncHandler, {}, {}));
+			aSrcImage->transition_to_layout(originalSrcLayout, sync::auxiliary_with_barriers(aSyncHandler, avk::sync::presets::default_handler_before_operation, {}));
 		}
 
 		if (aRestoreDstLayout) { // => restore original layout of the dst image
-			aDstImage->transition_to_layout(originalDstLayout, sync::auxiliary_with_barriers(aSyncHandler, {}, {}));
+			aDstImage->transition_to_layout(originalDstLayout, sync::auxiliary_with_barriers(aSyncHandler, avk::sync::presets::default_handler_before_operation, {}));
 		}
 		
 		// Sync after:
